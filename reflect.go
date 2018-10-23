@@ -4,18 +4,33 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/tinylib/msgp/msgp"
 )
 
+type conversionConfiguration struct {
+	tagName    string
+	useMsgPack bool
+}
+
 // ConvertToValue make map data from struct and tags
-func ConvertToValue(p interface{}, tagName string) interface{} {
+func ConvertToValue(p interface{}, config conversionConfiguration) interface{} {
+
+	if config.useMsgPack {
+		switch p.(type) {
+		case msgp.Marshaler:
+			return p
+		}
+	}
+
 	rv := toValue(p)
 	switch rv.Kind() {
 	case reflect.Struct:
-		return convertFromStruct(rv.Interface(), tagName)
+		return convertFromStruct(rv.Interface(), config)
 	case reflect.Map:
-		return convertFromMap(rv, tagName)
+		return convertFromMap(rv, config)
 	case reflect.Slice:
-		return convertFromSlice(rv, tagName)
+		return convertFromSlice(rv, config)
 	case reflect.Chan:
 		return nil
 	case reflect.Invalid:
@@ -25,31 +40,31 @@ func ConvertToValue(p interface{}, tagName string) interface{} {
 	}
 }
 
-func convertFromMap(rv reflect.Value, tagName string) interface{} {
+func convertFromMap(rv reflect.Value, config conversionConfiguration) interface{} {
 	result := make(map[string]interface{})
 	for _, key := range rv.MapKeys() {
 		kv := rv.MapIndex(key)
-		result[fmt.Sprint(key.Interface())] = ConvertToValue(kv.Interface(), tagName)
+		result[fmt.Sprint(key.Interface())] = ConvertToValue(kv.Interface(), config)
 	}
 	return result
 }
 
-func convertFromSlice(rv reflect.Value, tagName string) interface{} {
+func convertFromSlice(rv reflect.Value, config conversionConfiguration) interface{} {
 	var result []interface{}
 	for i, max := 0, rv.Len(); i < max; i++ {
-		result = append(result, ConvertToValue(rv.Index(i).Interface(), tagName))
+		result = append(result, ConvertToValue(rv.Index(i).Interface(), config))
 	}
 	return result
 }
 
 // convertFromStruct converts struct to value
 // see: https://github.com/fatih/structs/
-func convertFromStruct(p interface{}, tagName string) interface{} {
+func convertFromStruct(p interface{}, config conversionConfiguration) interface{} {
 	result := make(map[string]interface{})
-	return convertFromStructDeep(result, tagName, toType(p), toValue(p))
+	return convertFromStructDeep(result, config, toType(p), toValue(p))
 }
 
-func convertFromStructDeep(result map[string]interface{}, tagName string, t reflect.Type, values reflect.Value) interface{} {
+func convertFromStructDeep(result map[string]interface{}, config conversionConfiguration, t reflect.Type, values reflect.Value) interface{} {
 	for i, max := 0, t.NumField(); i < max; i++ {
 		f := t.Field(i)
 		if f.PkgPath != "" && !f.Anonymous {
@@ -70,12 +85,12 @@ func convertFromStructDeep(result map[string]interface{}, tagName string, t refl
 			}
 
 			if vv.Kind() == reflect.Struct {
-				convertFromStructDeep(result, tagName, tt, vv)
+				convertFromStructDeep(result, config, tt, vv)
 			}
 			continue
 		}
 
-		tag, opts := parseTag(f, tagName)
+		tag, opts := parseTag(f, config.tagName)
 		if tag == "-" {
 			continue // skip `-` tag
 		}
@@ -87,8 +102,8 @@ func convertFromStructDeep(result map[string]interface{}, tagName string, t refl
 		if opts.Has("omitempty") && isZero(v) {
 			continue // skip zero-value when omitempty option exists in tag
 		}
-		name := getNameFromTag(f, tagName)
-		result[name] = ConvertToValue(v.Interface(), TagName)
+		name := getNameFromTag(f, config.tagName)
+		result[name] = ConvertToValue(v.Interface(), config)
 	}
 	return result
 }

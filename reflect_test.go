@@ -39,7 +39,7 @@ func TestConvertToValueStruct(t *testing.T) {
 		Weight: 4,
 		Alias:  "tama",
 	}
-	result := ConvertToValue(v, TagName)
+	result := ConvertToValue(v, conversionConfiguration{TagName, false})
 
 	r, ok := result.(map[string]interface{})
 	assert.True(ok)
@@ -63,7 +63,7 @@ func TestConvertToValueSlice(t *testing.T) {
 	list = append(list, nil)
 	list = append(list, &Creature{Name: "bird"})
 
-	result := ConvertToValue(list, TagName)
+	result := ConvertToValue(list, conversionConfiguration{TagName, false})
 	r, ok := result.([]interface{})
 	assert.True(ok)
 	assert.Len(r, 4)
@@ -71,10 +71,10 @@ func TestConvertToValueSlice(t *testing.T) {
 
 func TestConvertToValueNil(t *testing.T) {
 	assert := assert.New(t)
-	result := ConvertToValue(nil, TagName)
+	result := ConvertToValue(nil, conversionConfiguration{TagName, false})
 	assert.Equal(nil, result)
 
 	var ptr *Creature
-	result = ConvertToValue(ptr, TagName)
+	result = ConvertToValue(ptr, conversionConfiguration{TagName, false})
 	assert.Equal(nil, result)
 }

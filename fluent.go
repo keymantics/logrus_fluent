@@ -179,7 +179,7 @@ func (hook *FluentHook) Fire(entry *logrus.Entry) error {
 		hook.setMessage(entry, data)
 	}
 
-	fluentData := ConvertToValue(data, TagName)
+	fluentData := ConvertToValue(data, conversionConfiguration{TagName, !logger.Config.MarshalAsJSON})
 	err = logger.PostWithTime(tag, entry.Time, fluentData)
 	return err
 }
